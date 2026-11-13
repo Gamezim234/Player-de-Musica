@@ -1,33 +1,163 @@
 
 #include <LiquidCrystal.h>
+#include <avr/pgmspace.h>
 
 LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
 
 int ledVermelho = 8;
 int ledVerde = 9;
-int botaoTeste = 10;
-int buzzer = A0;
+int botaoPlay = 10;
 int botaoAvancar = 11;
 int botaoVoltar = 12;
 int botaoMenu = 13;
+int buzzer = A0;
 
 int musica = 1;
 bool noMenu = true;
+bool tocando = false;
+int antesMenu = HIGH;
 int antesAvancar = HIGH;
 int antesVoltar = HIGH;
-int antesMenu = HIGH;
-int antesTeste = HIGH;
-bool testeAtivo = false;
-unsigned long inicioTeste = 0;
+int antesPlay = HIGH;
+
+int notaAtual = 0;
+bool notaIniciada = false;
+unsigned long inicioNota = 0;
+unsigned long duracaoNota = 0;
+
+const int notasMusica1[] PROGMEM = {
+  659, 659, 0, 659, 0, 523, 659, 784, 0, 392, 0,
+  523, 392, 0, 330, 440, 494, 466, 440, 392, 659, 784, 880,
+  698, 784, 0, 659, 523, 587, 494,
+  523, 392, 0, 330, 440, 494, 466, 440, 392, 659, 784, 880,
+  698, 784, 0, 659, 523, 587, 494
+};
+
+const int duracoesMusica1[] PROGMEM = {
+  150, 150, 150, 150, 150, 150, 150, 300, 300, 150, 300,
+  450, 150, 300, 450, 300, 300, 150, 300, 225, 225, 225, 300,
+  150, 150, 150, 300, 150, 150, 450,
+  450, 150, 300, 450, 300, 300, 150, 300, 225, 225, 225, 300,
+  150, 150, 150, 300, 150, 150, 600
+};
+
+const int notasMusica2[] PROGMEM = {
+  784, 740, 659, 587, 523, 440, 494, 440, 784,
+  740, 523, 523, 587, 740, 880, 523, 784,
+  494, 523, 587, 392, 440, 784, 740, 659,
+  784, 740, 659, 784, 523, 494, 494, 523, 440, 784, 784
+};
+
+const int duracoesMusica2[] PROGMEM = {
+  220, 220, 220, 220, 440, 220, 220, 220, 440,
+  220, 220, 220, 440, 220, 220, 440, 440,
+  220, 220, 220, 220, 220, 440, 220, 440,
+  220, 220, 220, 220, 440, 220, 220, 220, 440, 220, 660
+};
+
+const int notasMusica3[] PROGMEM = {
+  294, 294, 587, 440, 0, 415, 392, 349, 294, 349, 392, 262, 262, 262, 262,
+  587, 440, 0, 415, 392, 349, 294, 349, 392, 262, 262, 262, 262,
+  294, 294, 587, 440, 0, 415, 392, 349, 294, 349, 392, 247, 247, 247, 247,
+  587, 440, 0, 415, 392, 349, 294, 349, 392, 247, 247, 247, 247,
+  294, 294, 587, 440, 0, 415, 392, 349, 294, 349, 392, 233, 233, 233, 233,
+  587, 440, 0, 415, 392, 349, 294, 349, 392, 233, 233, 233, 233,
+
+  587, 587, 1175, 880, 0, 831, 784, 698, 587, 698, 784, 523, 523, 523, 523,
+  1175, 880, 0, 831, 784, 698, 587, 698, 784, 523, 523, 523, 523,
+  587, 587, 1175, 880, 0, 831, 784, 698, 587, 698, 784, 494, 494, 494, 494,
+  1175, 880, 0, 831, 784, 698, 587, 698, 784, 494, 494, 494, 494,
+  587, 587, 1175, 880, 0, 831, 784, 698, 587, 698, 784, 466, 466, 466, 466,
+  1175, 880, 0, 831, 784, 698, 587, 698, 784, 466, 466, 466, 466
+};
+
+const int duracoesMusica3[] PROGMEM = {
+  125, 125, 250, 250, 125, 125, 250, 250, 125, 125, 125, 62, 62, 62, 62,
+  250, 375, 125, 250, 250, 125, 125, 125, 125, 62, 62, 62, 62,
+  125, 125, 250, 250, 125, 125, 250, 250, 125, 125, 125, 62, 62, 62, 62,
+  250, 375, 125, 250, 250, 125, 125, 125, 125, 62, 62, 62, 62,
+  125, 125, 250, 250, 125, 125, 250, 250, 125, 125, 125, 62, 62, 62, 62,
+  250, 375, 125, 250, 250, 125, 125, 125, 125, 62, 62, 62, 62,
+
+  125, 125, 250, 250, 125, 125, 250, 250, 125, 125, 125, 62, 62, 62, 62,
+  250, 375, 125, 250, 250, 125, 125, 125, 125, 62, 62, 62, 62,
+  125, 125, 250, 250, 125, 125, 250, 250, 125, 125, 125, 62, 62, 62, 62,
+  250, 375, 125, 250, 250, 125, 125, 125, 125, 62, 62, 62, 62,
+  125, 125, 250, 250, 125, 125, 250, 250, 125, 125, 125, 62, 62, 62, 62,
+  250, 375, 125, 250, 250, 125, 125, 125, 125, 62, 62, 62, 62
+};
+
+const int notasMusica4[] PROGMEM = {
+  147, 175, 294, 147, 175, 294, 330, 349, 330, 349, 330, 262, 220, 220,
+  147, 175, 196, 220, 220, 147, 175, 196, 165, 147, 175, 294,
+  147, 175, 294, 330, 349, 330, 349, 330, 262, 220, 220,
+  147, 175, 196, 220, 220, 147, 294, 349, 587, 294, 349, 587,
+  659, 698, 659, 698, 659, 523, 440, 440, 294, 349, 392, 440, 440,
+  294, 349, 349, 392, 330, 294, 349, 587, 294, 349, 587,
+  659, 698, 659, 698, 659, 523, 440, 440, 294, 349, 392, 440, 440, 440, 294
+};
+
+const int duracoesMusica4[] PROGMEM = {
+  190, 285, 950, 190, 190, 760, 1140, 190, 190, 190, 190, 190, 760, 950,
+  380, 190, 190, 1140, 380, 950, 190, 190, 1140, 190, 190, 1330,
+  190, 190, 760, 570, 190, 760, 190, 190, 190, 760, 380,
+  380, 190, 760, 760, 380, 950, 190, 760, 760, 190, 190, 760,
+  1140, 190, 190, 190, 190, 190, 760, 380, 950, 190, 190, 1140, 380,
+  380, 760, 95, 95, 1140, 190, 190, 1330, 190, 190, 760,
+  570, 190, 190, 190, 760, 190, 760, 380, 380, 190, 190, 950, 380, 380, 700
+};
+
+const int notasMusica5[] PROGMEM = {
+  330, 392, 330, 370, 294, 220, 196, 247, 370, 440, 440, 392, 277, 220, 294,
+  330, 392, 494, 659, 740, 587, 370, 440, 392, 494, 554, 370, 440, 440, 392,
+  554, 330, 220, 294, 330, 392, 494, 659, 740, 587, 370, 440, 392, 494,
+  554, 370, 440, 440, 392
+};
+
+const int duracoesMusica5[] PROGMEM = {
+  250, 250, 250, 750, 250, 250, 250, 750, 250, 250, 500, 500, 250, 250, 1000,
+  250, 250, 250, 750, 1000, 250, 250, 250, 750, 1000, 250, 250, 250, 250, 750,
+  250, 250, 250, 1000, 250, 250, 250, 750, 750, 250, 250, 250, 750, 750,
+  250, 250, 250, 250, 1250
+};
+
+int totalNotas[5] = {
+  sizeof(notasMusica1) / sizeof(int),
+  sizeof(notasMusica2) / sizeof(int),
+  sizeof(notasMusica3) / sizeof(int),
+  sizeof(notasMusica4) / sizeof(int),
+  sizeof(notasMusica5) / sizeof(int)
+};
 
 char nomes[5][17] = {
   "SUPER MARIO", "PALLET TOWN", "MEGALOVANIA", "SONG OF STORMS", "SWEDEN"
 };
 
+int pegarNota() {
+  if (musica == 1) return pgm_read_word(&notasMusica1[notaAtual]);
+  if (musica == 2) return pgm_read_word(&notasMusica2[notaAtual]);
+  if (musica == 3) return pgm_read_word(&notasMusica3[notaAtual]);
+  if (musica == 4) return pgm_read_word(&notasMusica4[notaAtual]);
+  return pgm_read_word(&notasMusica5[notaAtual]);
+}
+
+int pegarDuracao() {
+  if (musica == 1) return pgm_read_word(&duracoesMusica1[notaAtual]);
+  if (musica == 2) return pgm_read_word(&duracoesMusica2[notaAtual]);
+  if (musica == 3) return pgm_read_word(&duracoesMusica3[notaAtual]);
+  if (musica == 4) return pgm_read_word(&duracoesMusica4[notaAtual]);
+  return pgm_read_word(&duracoesMusica5[notaAtual]);
+}
+
+void reiniciarMusica() {
+  noTone(buzzer);
+  notaAtual = 0;
+  notaIniciada = false;
+}
+
 void mostrarTela() {
   lcd.clear();
   lcd.setCursor(0, 0);
-
   if (noMenu == true) {
     lcd.print("MENU DE MUSICAS");
     lcd.setCursor(0, 1);
@@ -41,12 +171,32 @@ void mostrarTela() {
   }
 }
 
+void tocarMusica() {
+  if (noMenu == true || tocando == false) return;
+
+  if (notaIniciada == false) {
+    int frequencia = pegarNota();
+    duracaoNota = pegarDuracao();
+    if (frequencia == 0) noTone(buzzer);
+    else tone(buzzer, frequencia);
+    inicioNota = millis();
+    notaIniciada = true;
+  }
+
+  if (millis() - inicioNota >= duracaoNota) {
+    noTone(buzzer);
+    notaAtual++;
+    if (notaAtual >= totalNotas[musica - 1]) notaAtual = 0;
+    notaIniciada = false;
+  }
+}
+
 void setup() {
   lcd.begin(16, 2);
+  pinMode(botaoMenu, INPUT_PULLUP);
   pinMode(botaoAvancar, INPUT_PULLUP);
   pinMode(botaoVoltar, INPUT_PULLUP);
-  pinMode(botaoMenu, INPUT_PULLUP);
-  pinMode(botaoTeste, INPUT_PULLUP);
+  pinMode(botaoPlay, INPUT_PULLUP);
   pinMode(ledVermelho, OUTPUT);
   pinMode(ledVerde, OUTPUT);
   pinMode(buzzer, OUTPUT);
@@ -57,12 +207,12 @@ void loop() {
   int menuAgora = digitalRead(botaoMenu);
   int avancarAgora = digitalRead(botaoAvancar);
   int voltarAgora = digitalRead(botaoVoltar);
-  int testeAgora = digitalRead(botaoTeste);
+  int playAgora = digitalRead(botaoPlay);
 
   if (menuAgora == LOW && antesMenu == HIGH) {
     noMenu = !noMenu;
-    testeAtivo = false;
-    noTone(buzzer);
+    tocando = false;
+    reiniciarMusica();
     mostrarTela();
   }
 
@@ -70,31 +220,28 @@ void loop() {
     if (avancarAgora == LOW && antesAvancar == HIGH) {
       musica++;
       if (musica > 5) musica = 1;
+      reiniciarMusica();
       mostrarTela();
     }
 
     if (voltarAgora == LOW && antesVoltar == HIGH) {
       musica--;
       if (musica < 1) musica = 5;
+      reiniciarMusica();
       mostrarTela();
+    }
+
+    if (playAgora == LOW && antesPlay == HIGH) {
+      tocando = true;
     }
   }
 
-  if (noMenu == false && testeAgora == LOW && antesTeste == HIGH) {
-    tone(buzzer, 440);
-    inicioTeste = millis();
-    testeAtivo = true;
-  }
-
-  if (testeAtivo == true && millis() - inicioTeste >= 300) {
-    noTone(buzzer);
-    testeAtivo = false;
-  }
+  tocarMusica();
 
   if (noMenu == true) {
     digitalWrite(ledVerde, LOW);
     digitalWrite(ledVermelho, LOW);
-  } else if (testeAtivo == true) {
+  } else if (tocando == true) {
     digitalWrite(ledVerde, HIGH);
     digitalWrite(ledVermelho, LOW);
   } else {
@@ -102,9 +249,9 @@ void loop() {
     digitalWrite(ledVermelho, HIGH);
   }
 
-  antesTeste = testeAgora;
   antesMenu = menuAgora;
   antesAvancar = avancarAgora;
   antesVoltar = voltarAgora;
+  antesPlay = playAgora;
   delay(20);
 }
