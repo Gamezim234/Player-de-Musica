@@ -1,0 +1,73 @@
+
+#include <LiquidCrystal.h>
+
+LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
+
+int botaoAvancar = 11;
+int botaoVoltar = 12;
+int botaoMenu = 13;
+
+int musica = 1;
+bool noMenu = true;
+int antesAvancar = HIGH;
+int antesVoltar = HIGH;
+int antesMenu = HIGH;
+
+char nomes[5][17] = {
+  "SUPER MARIO", "PALLET TOWN", "MEGALOVANIA", "SONG OF STORMS", "SWEDEN"
+};
+
+void mostrarTela() {
+  lcd.clear();
+  lcd.setCursor(0, 0);
+
+  if (noMenu == true) {
+    lcd.print("MENU DE MUSICAS");
+    lcd.setCursor(0, 1);
+    lcd.print("Botao: ouvir som");
+  } else {
+    lcd.print("Musica ");
+    lcd.print(musica);
+    lcd.print(" de 5");
+    lcd.setCursor(0, 1);
+    lcd.print(nomes[musica - 1]);
+  }
+}
+
+void setup() {
+  lcd.begin(16, 2);
+  pinMode(botaoAvancar, INPUT_PULLUP);
+  pinMode(botaoVoltar, INPUT_PULLUP);
+  pinMode(botaoMenu, INPUT_PULLUP);
+  mostrarTela();
+}
+
+void loop() {
+  int menuAgora = digitalRead(botaoMenu);
+  int avancarAgora = digitalRead(botaoAvancar);
+  int voltarAgora = digitalRead(botaoVoltar);
+
+  if (menuAgora == LOW && antesMenu == HIGH) {
+    noMenu = !noMenu;
+    mostrarTela();
+  }
+
+  if (noMenu == false) {
+    if (avancarAgora == LOW && antesAvancar == HIGH) {
+      musica++;
+      if (musica > 5) musica = 1;
+      mostrarTela();
+    }
+
+    if (voltarAgora == LOW && antesVoltar == HIGH) {
+      musica--;
+      if (musica < 1) musica = 5;
+      mostrarTela();
+    }
+  }
+
+  antesMenu = menuAgora;
+  antesAvancar = avancarAgora;
+  antesVoltar = voltarAgora;
+  delay(20);
+}
