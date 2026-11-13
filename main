@@ -3,6 +3,10 @@
 
 LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
 
+int ledVermelho = 8;
+int ledVerde = 9;
+int botaoTeste = 10;
+int buzzer = A0;
 int botaoAvancar = 11;
 int botaoVoltar = 12;
 int botaoMenu = 13;
@@ -12,6 +16,9 @@ bool noMenu = true;
 int antesAvancar = HIGH;
 int antesVoltar = HIGH;
 int antesMenu = HIGH;
+int antesTeste = HIGH;
+bool testeAtivo = false;
+unsigned long inicioTeste = 0;
 
 char nomes[5][17] = {
   "SUPER MARIO", "PALLET TOWN", "MEGALOVANIA", "SONG OF STORMS", "SWEDEN"
@@ -39,6 +46,10 @@ void setup() {
   pinMode(botaoAvancar, INPUT_PULLUP);
   pinMode(botaoVoltar, INPUT_PULLUP);
   pinMode(botaoMenu, INPUT_PULLUP);
+  pinMode(botaoTeste, INPUT_PULLUP);
+  pinMode(ledVermelho, OUTPUT);
+  pinMode(ledVerde, OUTPUT);
+  pinMode(buzzer, OUTPUT);
   mostrarTela();
 }
 
@@ -46,9 +57,12 @@ void loop() {
   int menuAgora = digitalRead(botaoMenu);
   int avancarAgora = digitalRead(botaoAvancar);
   int voltarAgora = digitalRead(botaoVoltar);
+  int testeAgora = digitalRead(botaoTeste);
 
   if (menuAgora == LOW && antesMenu == HIGH) {
     noMenu = !noMenu;
+    testeAtivo = false;
+    noTone(buzzer);
     mostrarTela();
   }
 
@@ -66,6 +80,29 @@ void loop() {
     }
   }
 
+  if (noMenu == false && testeAgora == LOW && antesTeste == HIGH) {
+    tone(buzzer, 440);
+    inicioTeste = millis();
+    testeAtivo = true;
+  }
+
+  if (testeAtivo == true && millis() - inicioTeste >= 300) {
+    noTone(buzzer);
+    testeAtivo = false;
+  }
+
+  if (noMenu == true) {
+    digitalWrite(ledVerde, LOW);
+    digitalWrite(ledVermelho, LOW);
+  } else if (testeAtivo == true) {
+    digitalWrite(ledVerde, HIGH);
+    digitalWrite(ledVermelho, LOW);
+  } else {
+    digitalWrite(ledVerde, LOW);
+    digitalWrite(ledVermelho, HIGH);
+  }
+
+  antesTeste = testeAgora;
   antesMenu = menuAgora;
   antesAvancar = avancarAgora;
   antesVoltar = voltarAgora;
