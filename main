@@ -6,7 +6,7 @@ LiquidCrystal lcd(2, 3, 4, 5, 6, 7);
 
 int ledVermelho = 8;
 int ledVerde = 9;
-int botaoPlay = 10;
+int botaoPausar = 10;
 int botaoAvancar = 11;
 int botaoVoltar = 12;
 int botaoMenu = 13;
@@ -14,16 +14,20 @@ int buzzer = A0;
 
 int musica = 1;
 bool noMenu = true;
-bool tocando = false;
+bool pausado = true;
+bool jaTocou = false;
+
 int antesMenu = HIGH;
 int antesAvancar = HIGH;
 int antesVoltar = HIGH;
-int antesPlay = HIGH;
+int antesPausar = HIGH;
 
 int notaAtual = 0;
-bool notaIniciada = false;
+bool tocandoNota = false;
+
 unsigned long inicioNota = 0;
 unsigned long duracaoNota = 0;
+unsigned long tempoRestante = 0;
 
 const int notasMusica1[] PROGMEM = {
   659, 659, 0, 659, 0, 523, 659, 784, 0, 392, 0,
@@ -130,7 +134,11 @@ int totalNotas[5] = {
 };
 
 char nomes[5][17] = {
-  "SUPER MARIO", "PALLET TOWN", "MEGALOVANIA", "SONG OF STORMS", "SWEDEN"
+  "SUPER MARIO",
+  "PALLET TOWN",
+  "MEGALOVANIA",
+  "SONG OF STORMS",
+  "SWEDEN"
 };
 
 int pegarNota() {
@@ -152,12 +160,15 @@ int pegarDuracao() {
 void reiniciarMusica() {
   noTone(buzzer);
   notaAtual = 0;
-  notaIniciada = false;
+  tocandoNota = false;
+  duracaoNota = 0;
+  tempoRestante = 0;
 }
 
 void mostrarTela() {
   lcd.clear();
   lcd.setCursor(0, 0);
+
   if (noMenu == true) {
     lcd.print("MENU DE MUSICAS");
     lcd.setCursor(0, 1);
@@ -171,87 +182,150 @@ void mostrarTela() {
   }
 }
 
-void tocarMusica() {
-  if (noMenu == true || tocando == false) return;
+void atualizarLeds() {
+  if (noMenu == true || jaTocou == false) {
+    digitalWrite(ledVerde, LOW);
+    digitalWrite(ledVermelho, LOW);
+  } else if (pausado == true) {
+    digitalWrite(ledVerde, LOW);
+    digitalWrite(ledVermelho, HIGH);
+  } else {
+    digitalWrite(ledVerde, HIGH);
+    digitalWrite(ledVermelho, LOW);
+  }
+}
 
-  if (notaIniciada == false) {
+void tocarMusica() {
+  if (noMenu == true || pausado == true) {
+    return;
+  }
+
+  if (tocandoNota == false) {
     int frequencia = pegarNota();
-    duracaoNota = pegarDuracao();
-    if (frequencia == 0) noTone(buzzer);
-    else tone(buzzer, frequencia);
+
+    if (tempoRestante > 0) {
+      duracaoNota = tempoRestante;
+      tempoRestante = 0;
+    } else {
+      duracaoNota = pegarDuracao();
+    }
+
+    if (frequencia == 0) {
+      noTone(buzzer);
+    } else {
+      tone(buzzer, frequencia);
+    }
+
     inicioNota = millis();
-    notaIniciada = true;
+    tocandoNota = true;
   }
 
   if (millis() - inicioNota >= duracaoNota) {
     noTone(buzzer);
     notaAtual++;
-    if (notaAtual >= totalNotas[musica - 1]) notaAtual = 0;
-    notaIniciada = false;
+
+    if (notaAtual >= totalNotas[musica - 1]) {
+      notaAtual = 0;
+    }
+
+    tocandoNota = false;
   }
 }
 
 void setup() {
   lcd.begin(16, 2);
+
   pinMode(botaoMenu, INPUT_PULLUP);
+  pinMode(botaoPausar, INPUT_PULLUP);
   pinMode(botaoAvancar, INPUT_PULLUP);
   pinMode(botaoVoltar, INPUT_PULLUP);
-  pinMode(botaoPlay, INPUT_PULLUP);
+
   pinMode(ledVermelho, OUTPUT);
   pinMode(ledVerde, OUTPUT);
   pinMode(buzzer, OUTPUT);
+
   mostrarTela();
+  atualizarLeds();
 }
 
 void loop() {
   int menuAgora = digitalRead(botaoMenu);
   int avancarAgora = digitalRead(botaoAvancar);
   int voltarAgora = digitalRead(botaoVoltar);
-  int playAgora = digitalRead(botaoPlay);
+  int pausarAgora = digitalRead(botaoPausar);
 
   if (menuAgora == LOW && antesMenu == HIGH) {
-    noMenu = !noMenu;
-    tocando = false;
+    if (noMenu == true) {
+      noMenu = false;
+    } else {
+      noMenu = true;
+    }
+
+    pausado = true;
+    jaTocou = false;
     reiniciarMusica();
     mostrarTela();
   }
 
   if (noMenu == false) {
-    if (avancarAgora == LOW && antesAvancar == HIGH) {
+
+    if (avancarAgora == LOW && antesAvancar == HIGH && pausado == true) {
       musica++;
-      if (musica > 5) musica = 1;
+
+      if (musica > 5) {
+        musica = 1;
+      }
+
       reiniciarMusica();
       mostrarTela();
     }
 
-    if (voltarAgora == LOW && antesVoltar == HIGH) {
+    if (voltarAgora == LOW && antesVoltar == HIGH && pausado == true) {
       musica--;
-      if (musica < 1) musica = 5;
+
+      if (musica < 1) {
+        musica = 5;
+      }
+
       reiniciarMusica();
       mostrarTela();
     }
 
-    if (playAgora == LOW && antesPlay == HIGH) {
-      tocando = true;
+    if (pausarAgora == LOW && antesPausar == HIGH) {
+      if (pausado == true) {
+        pausado = false;
+        jaTocou = true;
+      } else {
+        pausado = true;
+
+        if (tocandoNota == true) {
+          unsigned long passou = millis() - inicioNota;
+
+          if (passou < duracaoNota) {
+            tempoRestante = duracaoNota - passou;
+          } else {
+            tempoRestante = 0;
+            notaAtual++;
+
+            if (notaAtual >= totalNotas[musica - 1]) {
+              notaAtual = 0;
+            }
+          }
+        }
+
+        noTone(buzzer);
+        tocandoNota = false;
+      }
     }
   }
 
   tocarMusica();
-
-  if (noMenu == true) {
-    digitalWrite(ledVerde, LOW);
-    digitalWrite(ledVermelho, LOW);
-  } else if (tocando == true) {
-    digitalWrite(ledVerde, HIGH);
-    digitalWrite(ledVermelho, LOW);
-  } else {
-    digitalWrite(ledVerde, LOW);
-    digitalWrite(ledVermelho, HIGH);
-  }
+  atualizarLeds();
 
   antesMenu = menuAgora;
   antesAvancar = avancarAgora;
   antesVoltar = voltarAgora;
-  antesPlay = playAgora;
+  antesPausar = pausarAgora;
+
   delay(20);
 }
